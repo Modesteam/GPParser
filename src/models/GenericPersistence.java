@@ -1,18 +1,14 @@
 package models;
 
-import java.lang.annotation.Annotation;
-import java.lang.invoke.ConstantCallSite;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Type;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 
 import libraries.Column;
 import libraries.DatabaseConnection;
@@ -28,6 +24,7 @@ public class GenericPersistence extends DatabaseConnection {
 		super();
 	}
 
+	//TODO Update generic method
 	public boolean beanHasElementWithAttribute(Bean bean, String column, String value) throws SQLException {
 		int result = 0;
 
@@ -46,6 +43,7 @@ public class GenericPersistence extends DatabaseConnection {
 		return (result == 1) ? true : false;
 	}
 
+	//TODO Update generic method
 	public ArrayList<Bean> selectBeanRelationship(Bean bean, String table)
 			throws SQLException {
 		this.openConnection();
@@ -67,6 +65,7 @@ public class GenericPersistence extends DatabaseConnection {
 		return beans;
 	}
 
+	//TODO Update generic method
 	public boolean verifyIfAlreadyExistsBeanRelationship (Bean first, Bean second) throws SQLException {
 		int result = 0;
 
@@ -112,7 +111,175 @@ public class GenericPersistence extends DatabaseConnection {
 		this.closeConnection();
 		return (result == 1) ? true : false;
 	}
+
+	//TODO Update generic method
+	public boolean addBeanRelationship(Bean parentBean, Bean childBean)
+			throws SQLException {
+		this.openConnection();
+		String sql = "INSERT INTO " + parentBean.relationship + "(id_"
+				+ parentBean.identifier + ",id_" + childBean.identifier
+				+ ") VALUES(?,?)";
+		this.pst = this.conn.prepareStatement(sql);
+		this.pst.setString(1, parentBean.get(parentBean.fieldsList().get(0)));
+		this.pst.setString(2, childBean.get(childBean.fieldsList().get(0)));
+		int result = this.pst.executeUpdate();
+		this.closeConnection();
+		return (result == 1) ? true : false;
+	}
 	
+	//TODO Update generic method
+	public boolean deleteBeanRelationship(Bean parentBean, Bean childBean)
+			throws SQLException {
+		this.openConnection();
+		String sql = "DELETE FROM " + parentBean.relationship + "  WHERE id_"
+				+ parentBean.identifier + " = ? AND id_" + childBean.identifier
+				+ " = ?";
+		this.pst = this.conn.prepareStatement(sql);
+		this.pst.setString(1, parentBean.get(parentBean.fieldsList().get(0)));
+		this.pst.setString(2, childBean.get(childBean.fieldsList().get(0)));
+		int result = this.pst.executeUpdate();
+		this.closeConnection();
+		return (result == 1) ? true : false;
+	}
+
+	public Object selectBean(Object bean) throws SQLException {
+		this.openConnection();
+		
+		Entity entity = bean.getClass().getAnnotation(Entity.class);
+		ArrayList<Field> beanFields = new ArrayList<Field>(Arrays.asList(bean.getClass().getDeclaredFields()));
+		Field primaryField = primaryField(bean);
+		
+		
+		String sql = "SELECT * FROM " + entity.table() + " WHERE " + primaryColumn(primaryField) + " = ?";
+		this.pst = this.conn.prepareStatement(sql);
+		prepare(this.pst, bean, 1, primaryField);
+		
+		ResultSet rs = this.pst.executeQuery();
+		
+		Object result = null;
+		if (rs.next()) {
+			result = result(rs, bean, beanFields);
+		}
+		this.closeConnection();
+		return result;
+	}
+
+	public ArrayList<Object> selectAllBeans(Object bean) throws SQLException {
+		this.openConnection();
+		ArrayList<Object> beans = new ArrayList<Object>();
+		
+		Entity entity = bean.getClass().getAnnotation(Entity.class);
+		ArrayList<Field> beanFields = new ArrayList<Field>(
+				Arrays.asList(bean.getClass().getDeclaredFields()));
+		
+		String sql = "SELECT * FROM " + entity.table();
+		this.pst = this.conn.prepareStatement(sql);
+
+		ResultSet rs = this.pst.executeQuery();
+		while (rs.next()) {
+			beans.add(result(rs, bean, beanFields));
+		}
+		this.closeConnection();
+		return beans;
+	}
+
+	public Integer countBean(Object bean) throws SQLException {
+		Integer count = 0;
+		
+		Entity entity = bean.getClass().getAnnotation(Entity.class);
+		String sql = "SELECT COUNT(*) FROM " + entity.table();
+
+		this.openConnection();
+		this.pst = this.conn.prepareStatement(sql);
+
+		ResultSet rs = this.pst.executeQuery();
+		if (rs.next())
+			count = rs.getInt(1);
+
+		this.closeConnection();
+
+		return count;
+	}
+
+	public Object firstOrLastBean(Object bean, boolean last) throws SQLException {
+		Entity entity = bean.getClass().getAnnotation(Entity.class);
+		ArrayList<Field> beanFields = new ArrayList<Field>(
+				Arrays.asList(bean.getClass().getDeclaredFields()));
+		Object result = null;
+		String sql = "SELECT * FROM " + entity.table() + " ORDER BY "
+				+ primaryColumn(primaryField(bean));
+
+		if(last)
+			sql += " DESC";
+		
+		sql+=" LIMIT 1";
+
+		this.openConnection();
+		this.pst = this.conn.prepareStatement(sql);
+		ResultSet rs = this.pst.executeQuery();
+
+		if (rs.next()) {
+			result = result(rs, bean, beanFields);
+		}
+		this.closeConnection();
+
+		return result;
+	}
+
+	//TODO Update generic method
+	public ArrayList<Bean> selectBeanWhere(Bean type, String field,
+			String value, boolean use_like) throws SQLException {
+		ArrayList<Bean> beans = new ArrayList<Bean>();
+		String sql = "SELECT * FROM " + type.identifier + " WHERE ";
+
+		if (!use_like)
+			sql += field+" =?";
+		else
+			sql += field+" LIKE ?";
+
+		this.openConnection();
+		this.pst = this.conn.prepareStatement(sql);
+		if (use_like)
+			this.pst.setString(1, "%" + value + "%");
+		else
+			this.pst.setString(1, value);
+
+		ResultSet rs = this.pst.executeQuery();
+		while (rs.next()) {
+			Bean bean = init(type.identifier);
+			for (String s : type.fieldsList()) {
+				bean.set(s, rs.getString(s));
+			}
+			beans.add(bean);
+		}
+		this.closeConnection();
+
+		return beans;
+	}
+	
+	public boolean deleteBean(Object bean) throws SQLException {
+		this.openConnection();
+		Entity entity = bean.getClass().getAnnotation(Entity.class);
+		Field primaryField = primaryField(bean);
+		
+		String sql = "DELETE FROM "+ entity.table() + " WHERE "+ primaryColumn(primaryField) +" = ?";
+		this.pst = this.conn.prepareStatement(sql);
+		prepare(this.pst, bean, 1, primaryField);
+		int result = this.pst.executeUpdate();
+		this.closeConnection();
+		return (result == 1) ? true : false;
+	}
+
+	public Bean init(String beanIdentifier) {
+		Bean object = null;
+		if (beanIdentifier.equals("dummy")) {
+			//object = new Dummy();
+		}		
+		return object;
+	}
+	
+	
+	//Static Helpers *****************************
 	
 	public static Field primaryField(Object bean){
 		Field primaryField = null;
@@ -312,163 +479,6 @@ public class GenericPersistence extends DatabaseConnection {
 		}
 		
 		return bean;
-	}
-
-	public boolean addBeanRelationship(Bean parentBean, Bean childBean)
-			throws SQLException {
-		this.openConnection();
-		String sql = "INSERT INTO " + parentBean.relationship + "(id_"
-				+ parentBean.identifier + ",id_" + childBean.identifier
-				+ ") VALUES(?,?)";
-		this.pst = this.conn.prepareStatement(sql);
-		this.pst.setString(1, parentBean.get(parentBean.fieldsList().get(0)));
-		this.pst.setString(2, childBean.get(childBean.fieldsList().get(0)));
-		int result = this.pst.executeUpdate();
-		this.closeConnection();
-		return (result == 1) ? true : false;
-	}
-	
-	public boolean deleteBeanRelationship(Bean parentBean, Bean childBean)
-			throws SQLException {
-		this.openConnection();
-		String sql = "DELETE FROM " + parentBean.relationship + "  WHERE id_"
-				+ parentBean.identifier + " = ? AND id_" + childBean.identifier
-				+ " = ?";
-		this.pst = this.conn.prepareStatement(sql);
-		this.pst.setString(1, parentBean.get(parentBean.fieldsList().get(0)));
-		this.pst.setString(2, childBean.get(childBean.fieldsList().get(0)));
-		int result = this.pst.executeUpdate();
-		this.closeConnection();
-		return (result == 1) ? true : false;
-	}
-
-	public Object selectBean(Object bean) throws SQLException {
-		this.openConnection();
-		
-		Entity entity = bean.getClass().getAnnotation(Entity.class);
-		ArrayList<Field> beanFields = new ArrayList<Field>(Arrays.asList(bean.getClass().getDeclaredFields()));
-		Field primaryField = primaryField(bean);
-		
-		
-		String sql = "SELECT * FROM " + entity.table() + " WHERE " + primaryColumn(primaryField) + " = ?";
-		this.pst = this.conn.prepareStatement(sql);
-		prepare(this.pst, bean, 1, primaryField);
-		
-		ResultSet rs = this.pst.executeQuery();
-		
-		Object result = null;
-		if (rs.next()) {
-			result = result(rs, bean, beanFields);
-		}
-		this.closeConnection();
-		return result;
-	}
-
-	public ArrayList<Bean> selectAllBeans(Bean type) throws SQLException {
-		this.openConnection();
-		ArrayList<Bean> beans = new ArrayList<Bean>();
-		String sql = "SELECT * FROM " + type.identifier;
-		this.pst = this.conn.prepareStatement(sql);
-
-		ResultSet rs = this.pst.executeQuery();
-		while (rs.next()) {
-			Bean bean = init(type.identifier);
-			for (String s : type.fieldsList()) {
-				bean.set(s, rs.getString(s));
-			}
-			beans.add(bean);
-		}
-		this.closeConnection();
-		return beans;
-	}
-
-	public Integer countBean(Bean type) throws SQLException {
-		Integer count = 0;
-		String sql = "SELECT COUNT(*) FROM " + type.identifier;
-
-		this.openConnection();
-		this.pst = this.conn.prepareStatement(sql);
-
-		ResultSet rs = this.pst.executeQuery();
-		if (rs.next())
-			count = rs.getInt(1);
-
-		this.closeConnection();
-
-		return count;
-	}
-
-	public Bean firstOrLastBean(Bean type, boolean last) throws SQLException {
-		Bean bean = null;
-		String sql = "SELECT * FROM " + type.identifier + " ORDER BY "
-				+ type.fieldsList().get(0);
-
-		if (!last)
-			sql += " LIMIT 1";
-		else
-			sql += " DESC LIMIT 1";
-
-		this.openConnection();
-		this.pst = this.conn.prepareStatement(sql);
-		ResultSet rs = this.pst.executeQuery();
-
-		if (rs.next()) {
-			bean = init(type.identifier);
-			for (String s : type.fieldsList()) {
-				bean.set(s, rs.getString(s));
-			}
-		}
-		this.closeConnection();
-
-		return bean;
-	}
-
-	public ArrayList<Bean> selectBeanWhere(Bean type, String field,
-			String value, boolean use_like) throws SQLException {
-		ArrayList<Bean> beans = new ArrayList<Bean>();
-		String sql = "SELECT * FROM " + type.identifier + " WHERE ";
-
-		if (!use_like)
-			sql += field+" =?";
-		else
-			sql += field+" LIKE ?";
-
-		this.openConnection();
-		this.pst = this.conn.prepareStatement(sql);
-		if (use_like)
-			this.pst.setString(1, "%" + value + "%");
-		else
-			this.pst.setString(1, value);
-
-		ResultSet rs = this.pst.executeQuery();
-		while (rs.next()) {
-			Bean bean = init(type.identifier);
-			for (String s : type.fieldsList()) {
-				bean.set(s, rs.getString(s));
-			}
-			beans.add(bean);
-		}
-		this.closeConnection();
-
-		return beans;
-	}
-	
-	public boolean deleteBean(Bean bean) throws SQLException {
-		this.openConnection();
-		String sql = "DELETE FROM "+bean.identifier+ " WHERE "+bean.fieldsList().get(0)+" = ?";
-		this.pst = this.conn.prepareStatement(sql);
-		this.pst.setString(1, bean.get(bean.fieldsList().get(0)));
-		int result = this.pst.executeUpdate();
-		this.closeConnection();
-		return (result == 1) ? true : false;
-	}
-
-	public Bean init(String beanIdentifier) {
-		Bean object = null;
-		if (beanIdentifier.equals("dummy")) {
-			//object = new Dummy();
-		}		
-		return object;
 	}
 
 }
