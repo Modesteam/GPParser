@@ -4,11 +4,13 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.security.Principal;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 
 import libraries.Column;
+import libraries.NotNullableException;
 
 public class Runn {
 	
@@ -19,6 +21,10 @@ public class Runn {
 		Carro carro = new Carro();
 		carro.setModelo("Gol");
 		carro.setRodas(3);
+		
+		Dummy dummy = new Dummy();
+		dummy.setName("lol");
+		dummy.setTest(34);
 		
 //		ArrayList<Field> beanFields = new ArrayList<Field>(Arrays.asList(bean.getClass().getDeclaredFields()));
 //		//System.out.println(beanFields.size());
@@ -39,11 +45,33 @@ public class Runn {
 		try {
 			gp = new GenericPersistence();
 			
-			gp.insertBean(carro);
+			gp.openConnection();
 			
-			Carro carro2 = new Carro(1);
+			Connection conn = gp.getConnection();
 			
-			System.out.println(gp.selectBean(carro2));
+			//gp.insertBean(dummy, conn);
+			
+			dummy = (Dummy) gp.firstOrLastBean(dummy, true, conn);
+			
+			System.out.println(dummy);
+			
+			//gp.insertMany(dummy, carro, conn);
+			
+			Carro carro2 = (Carro) gp.firstOrLastBean(carro, true, conn);
+			
+			System.out.println(dummy);
+			
+			gp.deleteBean(dummy, conn);
+			
+			dummy = (Dummy) gp.firstOrLastBean(dummy, true, conn);
+			
+			System.out.println(dummy);
+			
+			System.out.println((Carro) gp.firstOrLastBean(carro, true, conn));
+			for (Object obj : gp.selectMany(dummy, carro2, conn)) {
+				System.out.println((Carro)obj);
+			}
+			gp.closeConnection();
 			
 		} catch (ClassNotFoundException | SQLException e) {
 			// TODO Auto-generated catch block

@@ -19,11 +19,11 @@ public abstract class DatabaseConnection {
         connectionProperties = config.toProperties();
     }
 
-    protected void openConnection() throws SQLException{
+    public void openConnection() throws SQLException{
     		this.conn = DriverManager.getConnection(this.dataBaseName,this.connectionProperties);
     }
     
-    protected void closeConnection() throws SQLException{
+    public void closeConnection() throws SQLException{
     		this.conn.close();
     }
 }

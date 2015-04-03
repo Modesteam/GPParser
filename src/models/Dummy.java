@@ -2,19 +2,24 @@ package models;
 
 import java.util.ArrayList;
 
+import libraries.BelongsTo;
 import libraries.Column;
 import libraries.Entity;
 import libraries.HasMany;
+import libraries.HasOne;
 import libraries.Ignore;
+import libraries.ManyRelations;
+import libraries.OneRelations;
 
 @Entity(table="dummy", primaryKey="id")
-@HasMany(entity=Dummy.class, foreignKey="id_dummy")
+@ManyRelations({@HasMany(entity=Carro.class, foreignKey="idDummy")})
 public class Dummy{
 
-	@Column(name="_id")
+	@Column(name="_id", nullable=false)
 	private int id;
 
-	@Column(name="name")
+	@Ignore
+	@Column(name="name", nullable=true)
 	private String name;
 
 	int test;
@@ -47,6 +52,6 @@ public class Dummy{
 	@Override
 	public String toString() {
 		return "Dummy [id=" + id + ", name=" + name + ", test=" + test + "]";
-	}	
+	}
 
 }
