@@ -1,18 +1,17 @@
 package models;
 
-import java.util.ArrayList;
-
-import libraries.BelongsTo;
-import libraries.Column;
-import libraries.Entity;
-import libraries.HasMany;
-import libraries.HasOne;
-import libraries.Ignore;
-import libraries.ManyRelations;
-import libraries.OneRelations;
+import annotations.Column;
+import annotations.Entity;
+import annotations.HasMany;
+import annotations.Ignore;
+import annotations.ManyRelations;
+import annotations.OrderBy;
 
 @Entity(table="dummy", primaryKey="id")
-@ManyRelations({@HasMany(entity=Carro.class, foreignKey="idDummy")})
+@ManyRelations({
+	@HasMany(entity=Carro.class, foreignKey="idDummy")
+	})
+@OrderBy(field="name")
 public class Dummy{
 
 	@Column(name="_id", nullable=false)

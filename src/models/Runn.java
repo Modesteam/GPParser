@@ -1,26 +1,21 @@
 package models;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-import java.security.Principal;
+import helpers.Condition;
+import helpers.GenericPersistence;
+import helpers.Joiner;
+import helpers.Operator;
+
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
 
-import libraries.Column;
 import libraries.NotNullableException;
 
 public class Runn {
-	
-	private static final String  fmt = "%24s: %s%n";
 
 	public static void main(String[] args) {
-		// TODO Auto-generated method stub
 		Carro carro = new Carro();
 		carro.setModelo("Gol");
-		carro.setRodas(3);
+		carro.setRodas(1);
 		
 		Dummy dummy = new Dummy();
 		dummy.setName("lol");
@@ -61,15 +56,40 @@ public class Runn {
 			
 			System.out.println(dummy);
 			
-			gp.deleteBean(dummy, conn);
+			//gp.deleteBean(dummy, conn);
 			
 			dummy = (Dummy) gp.firstOrLastBean(dummy, true, conn);
 			
-			System.out.println(dummy);
+			Condition condition = new Condition(
+					new Condition(carro, "modelo" ,Operator.EQUAL, "Gol"),
+					Joiner.AND,
+					new Condition(dummy, "name", Operator.EQUAL, "aame"));
 			
-			System.out.println((Carro) gp.firstOrLastBean(carro, true, conn));
-			for (Object obj : gp.selectMany(dummy, carro2, conn)) {
-				System.out.println((Carro)obj);
+			condition.prepareSQL(carro2);
+			
+			
+			Engine engine = null;
+			//try {
+				//gp.insertBean(new Engine(3), conn);
+				engine = (Engine)gp.firstOrLastBean(new Engine(), true, conn);
+				//carro2.setIdEngine(engine.getId());
+				//gp.insertBean(carro2,conn);
+			//} catch (NotNullableException e) {
+				// TODO Auto-generated catch block
+			//	e.printStackTrace();
+			//}
+			
+			System.out.println(gp.selectOne(carro2, dummy,conn));
+			
+			//System.out.println(condition.getEntities());
+			
+			//System.out.println(condition.buildRelationshipChain(carro2, condition.getEntities()));
+			
+			//System.out.println(condition.getSql());
+			
+			//System.out.println(dummy);
+			for (Object obj : gp.selectWhere(carro2, condition)) {
+			//	System.out.println((Carro)obj);
 			}
 			gp.closeConnection();
 			

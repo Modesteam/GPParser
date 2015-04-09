@@ -1,20 +1,24 @@
 package models;
 
-import libraries.BelongsTo;
-import libraries.Column;
-import libraries.Entity;
-import libraries.HasOne;
+import annotations.Column;
+import annotations.Entity;
+import annotations.HasOne;
+import annotations.OneRelations;
+import annotations.OrderBy;
 
 @Entity(table="carro", primaryKey="id")
-@BelongsTo(entity=Dummy.class, reference="idDummy")
-@HasOne(entity=Engine.class, reference="idEngine")
+@OneRelations({
+	@HasOne(entity=Dummy.class, reference="idDummy", belongs=true),
+	@HasOne(entity=Engine.class, reference="idEngine", belongs=false)
+	})
+@OrderBy(field="rodas")
 public class Carro {
 
 	int id;
 	int rodas;
 	@Column(name="id_dummy", nullable=false)
 	int idDummy;
-	@Column(name="id_engine", nullable=true)
+	@Column(name="id_engine", nullable=false)
 	int idEngine;
 
 	String modelo;

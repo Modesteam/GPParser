@@ -1,10 +1,8 @@
-package models;
+package helpers;
 
-import java.lang.annotation.Target;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.CookieHandler;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -12,18 +10,15 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-
-import javax.activation.MailcapCommandMap;
-import javax.jws.Oneway;
-import javax.swing.text.StyledEditorKit.BoldAction;
-
-import libraries.BelongsTo;
-import libraries.Column;
+import annotations.Column;
+import annotations.Entity;
+import annotations.HasMany;
+import annotations.HasOne;
+import annotations.Ignore;
+import annotations.ManyRelations;
+import annotations.OneRelations;
+import annotations.OrderBy;
 import libraries.DatabaseConnection;
-import libraries.Entity;
-import libraries.HasMany;
-import libraries.Ignore;
-import libraries.ManyRelations;
 import libraries.NotNullableException;
 
 public class GenericPersistence extends DatabaseConnection {
@@ -39,101 +34,6 @@ public class GenericPersistence extends DatabaseConnection {
 		return this.conn;
 	}
 	
-	//TODO Update generic method
-	public boolean beanHasElementWithAttribute(Bean bean, String column, String value) throws SQLException {
-		int result = 0;
-
-		this.openConnection();
-		String sql = "SELECT 1 AS one FROM '"+bean.identifier+"' WHERE '"+bean.identifier+"'.'"+column+"' = ? LIMIT 1";
-		this.pst = this.conn.prepareStatement(sql);
-
-		this.pst.setString(1, value);
-		ResultSet rs = this.pst.executeQuery();
-
-		if (rs.next()) {
-			result = rs.getInt(1);
-		}
-		this.closeConnection();
-
-		return (result == 1) ? true : false;
-	}
-
-	//TODO Update generic method
-	public ArrayList<Bean> selectBeanRelationship(Bean bean, String table)
-			throws SQLException {
-		this.openConnection();
-		ArrayList<Bean> beans = new ArrayList<Bean>();
-		String sql = "SELECT c.* FROM " + table + " as c, " + bean.relationship
-				+ " as ci " + "WHERE ci.id_" + bean.identifier + "= ? "
-				+ "AND ci.id_" + table + " = c.id";
-		this.pst = this.conn.prepareStatement(sql);
-		this.pst.setString(1, bean.get(bean.fieldsList().get(0)));
-		ResultSet rs = this.pst.executeQuery();
-		while (rs.next()) {
-			Bean object = init(table);
-			for (String s : object.fieldsList()) {
-				object.set(s, rs.getString(s));
-			}
-			beans.add(object);
-		}
-		this.closeConnection();
-		return beans;
-	}
-	
-	public ArrayList<Object> selectMany(Object bean, Object target, Connection conn) throws SQLException{
-		ArrayList<Object> beans = new ArrayList<Object>();
-		ManyRelations hasMultiple = bean.getClass().getAnnotation(ManyRelations.class);
-		
-		if (hasMultiple != null){
-			HasMany hasMany = null;
-			for (int i = 0; i < hasMultiple.value().length; i++) {
-				if(hasMultiple.value()[i].entity().equals(target.getClass())){
-					hasMany = hasMultiple.value()[i];
-				}
-			}
-			if (hasMany != null){
-				Entity entity = target.getClass().getAnnotation(Entity.class);
-				String sql = "SELECT * FROM " + entity.table() +" WHERE "
-					+ databaseColumn(getField(target, hasMany.foreignKey())) + " = ?";
-				this.pst = conn.prepareStatement(sql);
-				
-				prepare(pst, bean, 1, primaryField(bean));
-				
-				ArrayList<Field> targetFields = getFields(target);
-
-				ResultSet rs = this.pst.executeQuery();
-				while (rs.next()) {
-					beans.add(result(rs, target, targetFields));
-				}
-			}
-		}
-		return beans;
-	}
-
-	//TODO Update generic method
-	public boolean verifyIfAlreadyExistsBeanRelationship (Bean first, Bean second) throws SQLException {
-		int result = 0;
-
-		this.openConnection();
-		String sql = "SELECT 1 AS one FROM 'courses_institutions' "+
-				"WHERE 'courses_institutions'.'id_"+first.identifier+"' = ? "+
-				"AND 'courses_institutions'.'id_"+second.identifier+"' = ? "+
-				"LIMIT 1";
-
-		this.pst = this.conn.prepareStatement(sql);
-		this.pst.setString(1, first.get(first.fieldsList().get(0)));
-		this.pst.setString(2, second.get(second.fieldsList().get(0)));
-
-		ResultSet rs = this.pst.executeQuery();
-
-		if (rs.next()) {
-			result = rs.getInt(1);
-		}
-		this.closeConnection();
-
-		return (result == 1) ? true : false;
-	}
-	
 	public boolean insertBean(Object bean) throws SQLException, NotNullableException {
 		this.openConnection();
 		boolean result = insertBean(bean, this.conn);
@@ -143,22 +43,22 @@ public class GenericPersistence extends DatabaseConnection {
 	
 	public boolean insertBean(Object bean, Connection conn) throws SQLException, NotNullableException {
 		Entity entity = bean.getClass().getAnnotation(Entity.class);
-		BelongsTo belongsTo = bean.getClass().getAnnotation(BelongsTo.class);
 		ArrayList<Field> beanFields = getFields(bean);
 		
-		Field relationField = null;
-		
-		if (belongsTo != null){
-			 relationField = getField(bean, belongsTo.reference());
-			 if (isNullRelation(bean, relationField)){
-				 if (relationField.getAnnotation(Column.class).nullable()){
-					 beanFields.remove(relationField);
-				 } else {
-					 throw new NotNullableException();
+		OneRelations oneRelations = bean.getClass().getAnnotation(OneRelations.class);
+		if(oneRelations != null){
+			for (int i = 0; i < oneRelations.value().length; i++) {
+				HasOne hasOne =  oneRelations.value()[i];
+				Field relationField = getField(bean, hasOne.reference());
+				if (isNullRelation(bean, relationField)){
+					 if (relationField.getAnnotation(Column.class).nullable()){
+						 beanFields.remove(relationField);
+					 } else {
+						 throw new NotNullableException();
+					 }
 				 }
-			 }
+			}
 		}
-		
 		
 		Field primaryField = primaryField(bean);
 		
@@ -171,6 +71,12 @@ public class GenericPersistence extends DatabaseConnection {
 		this.pst = conn.prepareStatement(sql);
 		
 		prepare(pst, bean, beanFields);
+		
+		int result = this.pst.executeUpdate();
+		return (result == 1) ? true : false;
+	}
+	
+	public boolean insertOne(Object bean, Object one) throws SQLException{
 		
 		int result = this.pst.executeUpdate();
 		return (result == 1) ? true : false;
@@ -208,21 +114,6 @@ public class GenericPersistence extends DatabaseConnection {
 		return false;
 	}
 	
-	//TODO Update generic method
-	public boolean deleteBeanRelationship(Bean parentBean, Bean childBean)
-			throws SQLException {
-		this.openConnection();
-		String sql = "DELETE FROM " + parentBean.relationship + "  WHERE id_"
-				+ parentBean.identifier + " = ? AND id_" + childBean.identifier
-				+ " = ?";
-		this.pst = this.conn.prepareStatement(sql);
-		this.pst.setString(1, parentBean.get(parentBean.fieldsList().get(0)));
-		this.pst.setString(2, childBean.get(childBean.fieldsList().get(0)));
-		int result = this.pst.executeUpdate();
-		this.closeConnection();
-		return (result == 1) ? true : false;
-	}
-
 	public Object selectBean(Object bean) throws SQLException {
 		this.openConnection();
 		Object result = selectBean(bean, this.conn);
@@ -231,7 +122,6 @@ public class GenericPersistence extends DatabaseConnection {
 	}
 	
 	public Object selectBean(Object bean, Connection conn) throws SQLException {
-		
 		
 		Entity entity = bean.getClass().getAnnotation(Entity.class);
 		ArrayList<Field> beanFields = getFields(bean);
@@ -250,26 +140,122 @@ public class GenericPersistence extends DatabaseConnection {
 		}
 		return result;
 	}
+	
+	public Object selectOne(Object bean, Object one) throws SQLException {
+		this.openConnection();
+		Object result = selectOne(bean, one, this.conn);
+		this.closeConnection();
+		return result;
+	}
+	
+	public Object selectOne(Object bean, Object one, Connection conn) throws SQLException{
+		Object result = null;
+		Entity entity = one.getClass().getAnnotation(Entity.class);
+		ArrayList<Field> beanFields = getFields(one);
+		Field primaryField = primaryField(one);
+		OneRelations oneRelations = bean.getClass().getAnnotation(OneRelations.class);
+		if(oneRelations != null){
+			HasOne hasOne = null;
+			for (int i = 0; i < oneRelations.value().length; i++) {
+				if(oneRelations.value()[i].entity() == one.getClass()){
+					hasOne = oneRelations.value()[i];
+				}
+			}
+			
+			String sql = "SELECT * FROM " + entity.table() + " WHERE " + 
+					primaryColumn(primaryField) + " = ?";
+			this.pst = conn.prepareStatement(sql);
+			prepare(this.pst, bean, 1, getField(bean, hasOne.reference()));
+			
+			ResultSet rs = this.pst.executeQuery();
+			
+			if (rs.next()) {
+				result = result(rs, one, beanFields);
+			}
+			
+			
+		}
+		return result;
+	}
 
 	public ArrayList<Object> selectAllBeans(Object bean) throws SQLException {
+		return selectAllBeans(bean, getOrderField(bean));
+	}
+	public ArrayList<Object> selectAllBeans(Object bean, Field orderBy) throws SQLException {
 		this.openConnection();
-		ArrayList<Object> beans = selectAllBeans(bean);
+		ArrayList<Object> beans = selectAllBeans(bean, orderBy, this.conn);
 		this.closeConnection();
 		return beans;
 	}
-	
 	public ArrayList<Object> selectAllBeans(Object bean, Connection conn) throws SQLException {
+		return selectAllBeans(bean, getOrderField(bean), conn);
+	}	
+	public ArrayList<Object> selectAllBeans(Object bean, Field orderBy, Connection conn) throws SQLException {
 		ArrayList<Object> beans = new ArrayList<Object>();
 		
 		Entity entity = bean.getClass().getAnnotation(Entity.class);
 		ArrayList<Field> beanFields = getFields(bean);
 		
 		String sql = "SELECT * FROM " + entity.table();
+		
+		System.out.println(orderBy);
+		
+		if(orderBy != null){
+			sql+= " ORDER BY "+ databaseColumn(orderBy);
+		}
+		
 		this.pst = conn.prepareStatement(sql);
 
 		ResultSet rs = this.pst.executeQuery();
 		while (rs.next()) {
 			beans.add(result(rs, bean, beanFields));
+		}
+		return beans;
+	}
+	
+	public ArrayList<Object> selectMany(Object bean, Object target) throws SQLException{
+		return selectMany(bean, target, getOrderField(target));
+	}
+	public ArrayList<Object> selectMany(Object bean, Object target, Field orderBy) throws SQLException{
+		this.openConnection();
+		ArrayList<Object> beans = selectMany(bean, target, orderBy, this.conn);
+		this.closeConnection();
+		return beans;
+	}
+	public ArrayList<Object> selectMany(Object bean, Object target, Connection conn) throws SQLException{
+		return selectMany(bean, target, getOrderField(target), conn);
+	}
+	public ArrayList<Object> selectMany(Object bean, Object target, Field orderBy, Connection conn) throws SQLException{
+		ArrayList<Object> beans = new ArrayList<Object>();
+		ManyRelations hasMultiple = bean.getClass().getAnnotation(ManyRelations.class);
+		
+		if (hasMultiple != null){
+			HasMany hasMany = null;
+			for (int i = 0; i < hasMultiple.value().length; i++) {
+				if(hasMultiple.value()[i].entity().equals(target.getClass())){
+					hasMany = hasMultiple.value()[i];
+				}
+			}
+			if (hasMany != null){
+				Entity entity = target.getClass().getAnnotation(Entity.class);
+				String sql = "SELECT * FROM " + entity.table() +" WHERE "
+					+ databaseColumn(getField(target, hasMany.foreignKey())) + " = ?";
+				
+				if(orderBy != null){
+					sql+= " ORDER BY "+ databaseColumn(orderBy);
+				}
+				
+				this.pst = conn.prepareStatement(sql);
+				
+				prepare(pst, bean, 1, primaryField(bean));
+				
+				ArrayList<Field> targetFields = getFields(target);
+
+				ResultSet rs = this.pst.executeQuery();
+				while (rs.next()) {
+					beans.add(result(rs, target, targetFields));
+				}
+			}
 		}
 		return beans;
 	}
@@ -328,35 +314,38 @@ public class GenericPersistence extends DatabaseConnection {
 
 		return result;
 	}
-
-	//TODO Update generic method
-	public ArrayList<Bean> selectBeanWhere(Bean type, String field,
-			String value, boolean use_like) throws SQLException {
-		ArrayList<Bean> beans = new ArrayList<Bean>();
-		String sql = "SELECT * FROM " + type.identifier + " WHERE ";
-
-		if (!use_like)
-			sql += field+" =?";
-		else
-			sql += field+" LIKE ?";
-
+	
+	public ArrayList<Object> selectWhere(Object bean,Condition condition) throws SQLException{
+		return selectWhere(bean, condition, getOrderField(bean));
+	}
+	public ArrayList<Object> selectWhere(Object bean, Condition condition, Field orderBy) throws SQLException{
 		this.openConnection();
-		this.pst = this.conn.prepareStatement(sql);
-		if (use_like)
-			this.pst.setString(1, "%" + value + "%");
-		else
-			this.pst.setString(1, value);
+		ArrayList<Object> beans = selectWhere(bean, condition, orderBy, this.conn);
+		this.closeConnection();
+		return beans;
+	}
+	public ArrayList<Object> selectWhere(Object bean, Condition condition, Connection conn) throws SQLException{
+		return selectWhere(bean, condition, getOrderField(bean), conn);
+	}
+	
+	public ArrayList<Object> selectWhere(Object bean, Condition condition, Field orderBy, Connection connection) throws SQLException{
+		ArrayList<Object> beans = new ArrayList<Object>();
+		ArrayList<Field> beanFields = getFields(bean);
+		
+		condition.prepareSQL(bean);
+		
+		String sql = condition.getSql();
+		
+		if(orderBy != null){
+			sql+= " ORDER BY "+ databaseColumn(orderBy);
+		}
+		
+		this.pst = conn.prepareStatement(sql);
 
 		ResultSet rs = this.pst.executeQuery();
 		while (rs.next()) {
-			Bean bean = init(type.identifier);
-			for (String s : type.fieldsList()) {
-				bean.set(s, rs.getString(s));
-			}
-			beans.add(bean);
+			beans.add(result(rs, bean, beanFields));
 		}
-		this.closeConnection();
-
 		return beans;
 	}
 	
@@ -378,7 +367,7 @@ public class GenericPersistence extends DatabaseConnection {
 					HasMany hasMany = hasMultiple.value()[i];
 					Class<?> child = hasMany.entity();
 					Object childInstance = child.newInstance();
-					ArrayList<Object> results = selectMany(bean, childInstance, conn);
+					ArrayList<Object> results = selectMany(bean, childInstance, getOrderField(bean) , conn);
 					for (Object object : results) {
 						boolean status = deleteBean(object, conn);
 						if (!status){
@@ -413,16 +402,17 @@ public class GenericPersistence extends DatabaseConnection {
 		return response;
 	}
 	
-	public Bean init(String beanIdentifier) {
-		Bean object = null;
-		if (beanIdentifier.equals("dummy")) {
-			//object = new Dummy();
-		}		
-		return object;
-	}
-	
 	
 	//Static Helpers *****************************
+	
+	public static Field getOrderField(Object bean){
+		OrderBy orderBy = bean.getClass().getAnnotation(OrderBy.class);
+		if(orderBy != null){
+			return getField(bean, orderBy.field());
+		}else{
+			return null;
+		}
+	}
 	
 	public static boolean isNullRelation(Object bean, Field field){
 		if (field.getType() == int.class){
