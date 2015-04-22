@@ -7,9 +7,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
+
 import annotations.Column;
 import annotations.Entity;
 import annotations.HasMany;
@@ -533,9 +536,17 @@ public class GenericPersistence extends DatabaseConnection {
 		Method result = null;
 		try {
 			char[] fieldName = field.getName().trim().toCharArray();
-	        fieldName[0] = Character.toUpperCase(fieldName[0]);
-			result = field.getDeclaringClass().getDeclaredMethod("get"+new String(fieldName));
-		} catch (NoSuchMethodException | SecurityException e) {
+	        String methodName = "";
+	        if ((field.getType() == Boolean.class ||
+	        		field.getType() == boolean.class) &&
+	        		new String(fieldName).contains("is")) {
+	        	methodName = new String(fieldName);
+	        } else {
+	        	fieldName[0] = Character.toUpperCase(fieldName[0]);
+	        	methodName = "get" + new String(fieldName);
+	        }
+	        result = field.getDeclaringClass().getDeclaredMethod(methodName);
+	    } catch (NoSuchMethodException | SecurityException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -556,8 +567,18 @@ public class GenericPersistence extends DatabaseConnection {
 	public static Method getSetter(Field field) {
 		try {
 			char[] fieldName = field.getName().trim().toCharArray();
-	        fieldName[0] = Character.toUpperCase(fieldName[0]);
-			return field.getDeclaringClass().getDeclaredMethod("set"+new String(fieldName), field.getType());
+			String methodName = "";
+	        if ((field.getType() == Boolean.class ||
+	        		field.getType() == boolean.class) &&
+	        		new String(fieldName).contains("is")) {
+	        	methodName = new String(fieldName);
+	        	methodName = methodName.substring(2);
+	        	methodName = "set" + methodName;
+	        } else {
+	        	fieldName[0] = Character.toUpperCase(fieldName[0]);
+	        	methodName = "set" + new String(fieldName);
+	        }
+	        return field.getDeclaringClass().getDeclaredMethod(methodName, field.getType());
 		} catch (NoSuchMethodException | SecurityException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -648,6 +669,10 @@ public class GenericPersistence extends DatabaseConnection {
 				pst.setInt(index, (Integer)test);
 			} else if (test instanceof Double) {
 				pst.setDouble(index, (Double)test);
+			} else if (test instanceof Date) {
+				pst.setTimestamp(index, new Timestamp(((Date)test).getTime()));
+			} else if (test instanceof Boolean) {
+				pst.setBoolean(index, (Boolean)test);
 			}
 			
 		} catch (IllegalAccessException | IllegalArgumentException
@@ -667,6 +692,10 @@ public class GenericPersistence extends DatabaseConnection {
 				setter.invoke(bean, rs.getInt(databaseColumn(field)));
 			} else if (test == Double.class) {
 				setter.invoke(bean, rs.getDouble(databaseColumn(field)));
+			} else if (test == Date.class) {
+				setter.invoke(bean, rs.getTimestamp(databaseColumn(field)));
+			} else if (test == Boolean.class || test == boolean.class) {
+				setter.invoke(bean, rs.getBoolean(databaseColumn(field)));
 			}
 			
 		} catch (IllegalAccessException | IllegalArgumentException
