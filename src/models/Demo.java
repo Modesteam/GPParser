@@ -1,10 +1,13 @@
 package models;
 
+import helpers.GenericPersistence;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -74,6 +77,14 @@ public class Demo {
 			lines.remove(0);
 			HashMap<String, Type> types = saveTypes(lines, true);
 			
+			//lines = Files.readAllLines(Paths.get("jars/files/tbl_infracao.csv") , Charset.forName("ISO-8859-1"));
+			//lines.remove(0);
+			//HashMap<String, Infraction> infractions = saveInfractions(lines, true);
+			
+			lines = Files.readAllLines(Paths.get("jars/files/cities.csv"), Charset.forName("ISO-8859-1"));
+			lines.remove(0);
+			HashMap<String, City> cities = saveCities(lines, true);
+			
 			
 		} catch (ClassNotFoundException | SQLException | NotNullableException | IOException e) {
 			// TODO Auto-generated catch block
@@ -81,6 +92,48 @@ public class Demo {
 		}
 		
 
+	}
+	//TODO finish
+	/*public static HashMap<String, Infraction> saveInfractions(List<String> lines, boolean commit) throws ClassNotFoundException, SQLException, NotNullableException{
+		HashMap<String, Infraction> types = new HashMap<String, Infraction>();
+		for (String line : lines) {
+			String key = line.split(":")[0];
+			String  = line.split(";")[1];
+			Infraction infraction = new Infraction();
+			if(commit){
+				infraction.save();
+			}
+			types.put(key, infraction);
+		}
+		return types;
+	}*/
+	
+	public static HashMap<String, City> saveCities(List<String> lines, boolean commit) throws ClassNotFoundException, SQLException, NotNullableException{
+		HashMap<String, City> cities = new HashMap<String, City>();
+		State lastState = new State();
+		GenericPersistence gP = new GenericPersistence();
+		gP.openConnection();
+		Connection conn = gP.getConnection();
+		for (String line : lines){
+			String state = line.split(";")[0];
+			String name = line.split(";")[1];
+			String key = line.split(";")[2].substring(0, line.split(";")[2].length());
+			
+			if(!state.equalsIgnoreCase(lastState.getName())){
+				lastState = new State(state);
+				gP.insertBean(lastState, conn);
+				lastState = (State)gP.firstOrLastBean(lastState, true, conn);
+			}
+			
+			City city = new City(key, name, lastState.getId());
+			
+			gP.insertBean(city, conn);
+			city = (City) gP.firstOrLastBean(city, true, conn);
+			
+			cities.put(key, city);
+		}
+		gP.closeConnection();
+		return cities;
 	}
 	
 	public static HashMap<String, Brand> saveBrands(List<String> lines, boolean commit) throws ClassNotFoundException, SQLException, NotNullableException{
