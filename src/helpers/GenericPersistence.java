@@ -79,6 +79,30 @@ public class GenericPersistence extends DatabaseConnection {
 		return (result == 1) ? true : false;
 	}
 	
+	public boolean insertAll(ArrayList<Object> beans, Connection conn) throws SQLException, NotNullableException {
+		Object bean = beans.get(0);
+		Entity entity = bean.getClass().getAnnotation(Entity.class);
+		ArrayList<Field> beanFields = getFields(bean);
+		
+		Field primaryField = primaryField(bean);
+		
+		beanFields.remove(primaryField);
+		
+		HashMap<String, String> sqlSets = buildStrings(beanFields);
+				
+		String sql = "INSERT INTO " + entity.table() + " (" + sqlSets.get(FIELDS) + ")";
+		sql += " VALUES(" + sqlSets.get(PARAMETERS)+")";
+		this.pst = conn.prepareStatement(sql);
+		
+		for (Object object : beans) {
+			prepare(pst, object, beanFields);
+			this.pst.executeUpdate();
+		}
+		
+		int result = 1;
+		return (result == 1) ? true : false;
+	}
+	
 	public boolean insertOne(Object bean, Object one) throws SQLException{
 		
 		int result = this.pst.executeUpdate();

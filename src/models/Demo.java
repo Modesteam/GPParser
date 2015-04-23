@@ -14,6 +14,8 @@ import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 
+import javax.jws.WebParam.Mode;
+
 import libraries.NotNullableException;
 
 public class Demo {
@@ -68,22 +70,30 @@ public class Demo {
 			System.out.println(Vehicle.last());
 			System.out.println(Ticket.last());
 			*/
-			
+
+			System.out.println("Read start! Brand");
 			List<String> lines = Files.readAllLines(Paths.get("jars/files/tbl_veiculo_marca.csv") , Charset.forName("ISO-8859-1"));
 			lines.remove(0);
+			System.out.println("Read done!");
 			HashMap<String, Brand> brands = saveBrands(lines, true);
 			
+			System.out.println("Read start! Type");
 			lines = Files.readAllLines(Paths.get("jars/files/tbl_veiculo_especie.csv") , Charset.forName("ISO-8859-1"));
 			lines.remove(0);
+			System.out.println("Read done!");
 			HashMap<String, Type> types = saveTypes(lines, true);
 			
-			//lines = Files.readAllLines(Paths.get("jars/files/tbl_infracao.csv") , Charset.forName("ISO-8859-1"));
-			//lines.remove(0);
-			//HashMap<String, Infraction> infractions = saveInfractions(lines, true);
+			System.out.println("Read start! Infraction");
+			lines = Files.readAllLines(Paths.get("jars/files/tbl_infracao.csv") , Charset.forName("ISO-8859-1"));
+			lines.remove(0);
+			System.out.println("Read done!");
+			HashMap<String, Infraction> infractions = saveInfractions(lines, true);
 			
+			System.out.println("Read start! City");
 			lines = Files.readAllLines(Paths.get("jars/files/cities.csv"), Charset.forName("ISO-8859-1"));
 			lines.remove(0);
-			HashMap<String, City> cities = saveCities(lines, true);
+			System.out.println("Read done!");
+			//HashMap<String, City> cities = saveCities(lines, true);
 			
 			
 		} catch (ClassNotFoundException | SQLException | NotNullableException | IOException e) {
@@ -93,20 +103,76 @@ public class Demo {
 		
 
 	}
-	//TODO finish
-	/*public static HashMap<String, Infraction> saveInfractions(List<String> lines, boolean commit) throws ClassNotFoundException, SQLException, NotNullableException{
-		HashMap<String, Infraction> types = new HashMap<String, Infraction>();
-		for (String line : lines) {
-			String key = line.split(":")[0];
-			String  = line.split(";")[1];
-			Infraction infraction = new Infraction();
-			if(commit){
-				infraction.save();
-			}
-			types.put(key, infraction);
+	
+	public static void saveEach(String line, boolean commit, HashMap<String, City> cities, HashMap<String, Brand> brands, HashMap<String, Type> types, Connection conn) throws ClassNotFoundException, SQLException, NotNullableException{
+		String[] data = line.split(";");
+		City city = (City)cities.get(data[9].substring(0, data[9].length()-1));
+		HighwayStretch highwayStretch = new HighwayStretch(
+				data[6], Integer.parseInt(data[8]), city.getId());
+		highwayStretch.save();
+		Brand brand;
+		if(data[30].trim().equalsIgnoreCase("")){
+			brand = brands.get("?");
+		} else {
+			brand = brands.get(data[30]);
 		}
-		return types;
-	}*/
+		Type type;
+		if(data[31].trim().equalsIgnoreCase("")){
+			type = types.get("?");
+		} else {
+			type = types.get(data[31]);
+		}
+		String modelName;
+		if(data[23].trim().equalsIgnoreCase("")){
+			modelName = "Não Informado";
+		} else {
+			modelName = data[23].trim();
+		}
+		Model model = new Model(modelName, brand.getId(), type.getId());
+		model.save();
+		boolean national;
+		if(data[34].equalsIgnoreCase("N")){
+			national = true;
+		} else {
+			national = false;
+		}
+		Vehicle vehicle = new Vehicle(national, model.getId());
+		vehicle.save();
+		
+		
+	}
+	
+	public static HashMap<String, Infraction> saveInfractions(List<String> lines, boolean commit) throws ClassNotFoundException, SQLException, NotNullableException{
+		HashMap<String, Infraction> infractions = new HashMap<String, Infraction>();
+		GenericPersistence gP = new GenericPersistence();
+		gP.openConnection();
+		Connection conn = gP.getConnection();
+		ArrayList<Object> objects = new ArrayList<Object>();
+		for (String line : lines) {
+			line = line.replaceAll("\"", "");
+			String[] data = line.split(";");
+			String key = data[0];
+			String description = data[1].trim();
+			String framing = data[3];
+			Double value;
+			if(data[4].equalsIgnoreCase("")){
+				value = 0.0;
+			} else {
+				value = Double.parseDouble(data[4]);
+			}
+			int cnh_points = Integer.parseInt(data[5]);
+			Infraction infraction = new Infraction(description,framing,value,cnh_points);
+			objects.add(infraction);
+			infractions.put(key, infraction);
+			System.out.println("a"+key);
+			
+		}
+		if(commit){
+			gP.insertAll(objects, conn);
+		}
+		gP.closeConnection();
+		return infractions;
+	}
 	
 	public static HashMap<String, City> saveCities(List<String> lines, boolean commit) throws ClassNotFoundException, SQLException, NotNullableException{
 		HashMap<String, City> cities = new HashMap<String, City>();
@@ -126,7 +192,7 @@ public class Demo {
 			}
 			
 			City city = new City(key, name, lastState.getId());
-			
+			System.out.println(key);
 			gP.insertBean(city, conn);
 			city = (City) gP.firstOrLastBean(city, true, conn);
 			
@@ -139,7 +205,7 @@ public class Demo {
 	public static HashMap<String, Brand> saveBrands(List<String> lines, boolean commit) throws ClassNotFoundException, SQLException, NotNullableException{
 		HashMap<String, Brand> brands = new HashMap<String, Brand>();
 		for (String line : lines) {
-			String key = line.split(":")[0];
+			String key = line.split(";")[0];
 			String data = line.split(";")[1];
 			Brand brand = new Brand(data);
 			if(commit){
@@ -153,7 +219,7 @@ public class Demo {
 	public static HashMap<String, Type> saveTypes(List<String> lines, boolean commit) throws ClassNotFoundException, SQLException, NotNullableException{
 		HashMap<String, Type> types = new HashMap<String, Type>();
 		for (String line : lines) {
-			String key = line.split(":")[0];
+			String key = line.split(";")[0];
 			String name = line.split(";")[1];
 			Type type = new Type("Description", name);
 			if(commit){
