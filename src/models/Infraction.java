@@ -74,10 +74,10 @@ public class Infraction {
 		this.cnhPoints = cnhPoints;
 	}
 	
-	public boolean save() throws ClassNotFoundException, SQLException, NotNullableException{
+	public int save() throws ClassNotFoundException, SQLException, NotNullableException{
 		GenericPersistence gP = new GenericPersistence();
-		boolean result = gP.insertBean(this);
-		this.setId(Infraction.last().getId());
+		int result = gP.insertBean(this);
+		this.setId(result);
 		return result;
 	}
 	

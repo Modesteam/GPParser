@@ -54,10 +54,10 @@ public class Type {
 		this.name = name;
 	}
 	
-	public boolean save() throws ClassNotFoundException, SQLException, NotNullableException{
+	public int save() throws ClassNotFoundException, SQLException, NotNullableException{
 		GenericPersistence gP = new GenericPersistence();
-		boolean result = gP.insertBean(this);
-		this.setId(Type.last().getId());
+		int result = gP.insertBean(this);
+		this.setId(result);
 		return result;
 	}
 	

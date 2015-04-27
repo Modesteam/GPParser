@@ -15,21 +15,20 @@ import annotations.OneRelations;
 
 @Entity(table="ticket", primaryKey="id")
 @OneRelations({
-	@HasOne(entity=Infraction.class, reference="idInfraction", belongs=true),
 	@HasOne(entity=HighwayStretch.class, reference ="idHighwayStretch", belongs=true),
-	@HasOne(entity=Vehicle.class, reference="idVehicle", belongs=true)
+	@HasOne(entity=Model.class, reference="idModel", belongs=true)
 })
 public class Ticket {
 	
 	@Column(name="_id", nullable=false)
 	private int id;
-	@Column(name="paid_value", nullable=true)
-	private Double paidValue;
 	private Date date;
-	@Column(name="id_vehicle", nullable=false)
-	private int idVehicle;
-	@Column(name="id_infraction", nullable=false)
-	private int idInfraction;
+	@Column(name="is_velocity", nullable=true)
+	private boolean isVelocity;
+	private Double limit;
+	private Double measure;
+	@Column(name="id_model", nullable=false)
+	private int idModel;
 	@Column(name="id_highway_stretch", nullable=false)
 	private int idHighwayStretch;
 	
@@ -41,28 +40,23 @@ public class Ticket {
 		super();
 		this.id = id;
 	}
-
-	public Ticket(Double paidValue, Date date, int idVehicle, int idInfraction,
-			int idHighwayStretch) {
+	
+	public Ticket(Date date, boolean isVelocity, Double limit, Double measure,
+			int idModel, int idHighwayStretch) {
 		super();
-		this.paidValue = paidValue;
 		this.date = date;
-		this.idVehicle = idVehicle;
-		this.idInfraction = idInfraction;
+		this.isVelocity = isVelocity;
+		this.limit = limit;
+		this.measure = measure;
+		this.idModel = idModel;
 		this.idHighwayStretch = idHighwayStretch;
 	}
-	
+
 	public int getId() {
 		return id;
 	}
 	public void setId(int id) {
 		this.id = id;
-	}
-	public Double getPaidValue() {
-		return paidValue;
-	}
-	public void setPaidValue(Double paidValue) {
-		this.paidValue = paidValue;
 	}
 	public Date getDate() {
 		return date;
@@ -70,17 +64,11 @@ public class Ticket {
 	public void setDate(Date date) {
 		this.date = date;
 	}
-	public int getIdVehicle() {
-		return idVehicle;
+	public int getIdModel() {
+		return idModel;
 	}
-	public void setIdVehicle(int idVehicle) {
-		this.idVehicle = idVehicle;
-	}
-	public int getIdInfraction() {
-		return idInfraction;
-	}
-	public void setIdInfraction(int idInfraction) {
-		this.idInfraction = idInfraction;
+	public void setIdModel(int idModel) {
+		this.idModel = idModel;
 	}
 	public int getIdHighwayStretch() {
 		return idHighwayStretch;
@@ -88,11 +76,29 @@ public class Ticket {
 	public void setIdHighwayStretch(int idHighwayStretch) {
 		this.idHighwayStretch = idHighwayStretch;
 	}
-	
-	public boolean save() throws ClassNotFoundException, SQLException, NotNullableException{
+	public boolean isVelocity() {
+		return isVelocity;
+	}
+	public void setVelocity(boolean isVelocity) {
+		this.isVelocity = isVelocity;
+	}
+	public Double getLimit() {
+		return limit;
+	}
+	public void setLimit(Double limit) {
+		this.limit = limit;
+	}
+	public Double getMeasure() {
+		return measure;
+	}
+	public void setMeasure(Double measure) {
+		this.measure = measure;
+	}
+
+	public int save() throws ClassNotFoundException, SQLException, NotNullableException{
 		GenericPersistence gP = new GenericPersistence();
-		boolean result = gP.insertBean(this);
-		this.setId(Ticket.last().getId());
+		int result = gP.insertBean(this);
+		this.setId(result);
 		return result;
 	}
 	
@@ -151,9 +157,10 @@ public class Ticket {
 
 	@Override
 	public String toString() {
-		return "Ticket [id=" + id + ", paidValue=" + paidValue + ", date="
-				+ date + ", idVehicle=" + idVehicle + ", idInfraction="
-				+ idInfraction + ", idHighwayStretch=" + idHighwayStretch + "]";
+		return "Ticket [id=" + id + ", date=" + date + ", isVelocity="
+				+ isVelocity + ", limit=" + limit + ", measure=" + measure
+				+ ", idModel=" + idModel + ", idHighwayStretch="
+				+ idHighwayStretch + "]";
 	}
 
 }

@@ -5,124 +5,173 @@ import helpers.GenericPersistence;
 import helpers.Joiner;
 import helpers.Operator;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import libraries.NotNullableException;
 
 public class Runn {
 
 	public static void main(String[] args) {
-		Carro carro = new Carro();
-		carro.setModelo("Gol");
-		carro.setRodas(1);
-		
-		Dummy dummy = new Dummy();
-		dummy.setName("lol");
-		dummy.setTest(34);
-		
-//		ArrayList<Field> beanFields = new ArrayList<Field>(Arrays.asList(bean.getClass().getDeclaredFields()));
-//		//System.out.println(beanFields.size());
-//		ArrayList<Method> methods = GenericPersistence.getGetters(bean, beanFields);
-//		//System.out.println(methods.size());
-//		for (Method method : methods) {
-//		//	System.out.println(method.getName());
-//		}
-//		for (String field : GenericPersistence.databaseColumns(beanFields)) {
-//		//	System.out.println(field);
-//		}
-		
-		
-		//System.out.println(beanFields.get(1).getAnnotation(Column.class).name());
-		
-		
-		GenericPersistence gp;
 		try {
-			gp = new GenericPersistence();
+			List<String> lines;
+			System.out.println("Read start! Brand");
 			
-			gp.openConnection();
+				lines = Files.readAllLines(Paths.get("jars/files/brand_relation.csv") , Charset.forName("ISO-8859-1"));
 			
-			Connection conn = gp.getConnection();
+			final HashMap<String, Brand> brands = new HashMap<String, Brand>();
+			for (String string : lines) {
+				String[] data = string.split(";");
+				brands.put(data[0], Brand.get(Integer.parseInt(data[1])));
+			}
+			System.out.println("Read done!");
 			
-			//gp.insertBean(dummy, conn);
-			
-			dummy = (Dummy) gp.firstOrLastBean(dummy, true, conn);
-			
-			System.out.println(dummy);
-			
-			//gp.insertMany(dummy, carro, conn);
-			
-			Carro carro2 = (Carro) gp.firstOrLastBean(carro, true, conn);
-			
-			System.out.println(dummy);
-			
-			//gp.deleteBean(dummy, conn);
-			
-			dummy = (Dummy) gp.firstOrLastBean(dummy, true, conn);
-			
-			Condition condition = new Condition(
-					new Condition(carro, "modelo" ,Operator.EQUAL, "Gol"),
-					Joiner.AND,
-					new Condition(dummy, "name", Operator.EQUAL, "aame"));
-			
-			condition.prepareSQL(carro2);
+			System.out.println("Read start! Type");
+			lines = Files.readAllLines(Paths.get("jars/files/type_relation.csv") , Charset.forName("ISO-8859-1"));
+			final HashMap<String, Type> types = new HashMap<String, Type>();
+			for (String string : lines) {
+				String[] data = string.split(";");
+				types.put(data[0], Type.get(Integer.parseInt(data[1])));
+			}
+			System.out.println("Read done!");
 			
 			
-			Engine engine = null;
-			//try {
-				//gp.insertBean(new Engine(3), conn);
-				engine = (Engine)gp.firstOrLastBean(new Engine(), true, conn);
-				//carro2.setIdEngine(engine.getId());
-				//gp.insertBean(carro2,conn);
-			//} catch (NotNullableException e) {
-				// TODO Auto-generated catch block
-			//	e.printStackTrace();
+			DirectoryStream<Path> paths = Files.newDirectoryStream(Paths.get("jars/files/ticket/"));
+			Iterator<Path> iterator = paths.iterator();
+			
+			//while(iterator.hasNext()){
+				
+				Path path = iterator.next();
+				System.out.println(path.toFile().getName());
+				System.out.println("Start: "+Calendar.getInstance().getTime());
+				final BufferedReader bufferedReader = Files.newBufferedReader(path, Charset.forName("ISO-8859-1"));
+				bufferedReader.readLine();
+				
+				final ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<String>();
+				
+				
+				final ThreadGroup readGroup = new ThreadGroup("Read");
+				Thread[] readThreads = new Thread[]{};
+				
+				for (int i = 0; i < 6; i++) {
+					Thread thread = new Thread(readGroup, new Runnable() {
+						
+						@Override
+						public void run() {
+							try {
+								while(bufferedReader.ready()){
+									queue.add(bufferedReader.readLine());
+								}
+							} catch (IOException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+						}
+					});
+					thread.start();
+				}
+				
+				
+				final ThreadGroup processGroup = new ThreadGroup("Process");
+				Thread[] processThreads = new Thread[]{};
+				for (int i = 0; i < 4; i++) {
+					Thread thread = new Thread(processGroup, new Runnable() {
+						
+						@Override
+						public void run() {
+							try {
+								GenericPersistence gP= new GenericPersistence();
+								gP.openConnection();
+								gP.beginTransaction();
+								Connection conn = gP.getConnection();
+								int i = 0;
+								while(!queue.isEmpty()){
+									String line = queue.poll();
+									if(line != null){
+										i++;
+										Demo.saveEach(line, true, brands, types, conn, gP);
+									}
+									if(i % 1000 == 0){
+										System.out.println(i);
+									}
+									if(i % 10000 == 0){
+										if(!conn.isClosed()){
+											conn.commit();
+											conn.close();
+										}
+										gP.closeConnection();
+										gP.openConnection();
+										gP.beginTransaction();
+										conn = gP.getConnection();
+									}
+								}
+								
+								if(!conn.isClosed()){
+									conn.commit();
+									conn.close();
+								}
+							
+							} catch (ClassNotFoundException | SQLException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							} catch (NotNullableException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+						}
+					});
+					thread.start();
+				}
+				
+				
+				readGroup.enumerate(readThreads);
+				processGroup.enumerate(processThreads);
+				
+				try {
+					for (int i = 0; i < processThreads.length; i++) {
+						processThreads[i].join();
+					}
+					for (int i = 0; i < readThreads.length; i++) {
+						readThreads[i].join();
+					}
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				
+				
 			//}
 			
-			System.out.println(gp.selectOne(carro2, dummy,conn));
 			
-			//System.out.println(condition.getEntities());
 			
-			//System.out.println(condition.buildRelationshipChain(carro2, condition.getEntities()));
 			
-			//System.out.println(condition.getSql());
-			
-			//System.out.println(dummy);
-			for (Object obj : gp.selectWhere(carro2, condition)) {
-			//	System.out.println((Carro)obj);
-			}
-			gp.closeConnection();
-			
-		} catch (ClassNotFoundException | SQLException e) {
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NumberFormatException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
-//		Method m = null;
-//		try {
-//			m = bean.getClass().getDeclaredMethod("setTest", 
-//					new Class<?>[]{ bean.getClass().getDeclaredField("test").getType()});
-//			Class<?> classs =  bean.getClass().getDeclaredField("test").getType();
-//			System.out.println(classs == Integer.class);
-//		} catch (NoSuchMethodException | SecurityException
-//				| NoSuchFieldException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-//		
-//		
-//		
-//		
-//		Class<?>[] pType  = m.getParameterTypes();
-//		Type[] gpType = m.getGenericParameterTypes();
-//		for (int i = 0; i < pType.length; i++) {
-//		    System.out.format(fmt,"ParameterType", pType[i]);
-//		    System.out.format(fmt,"GenericParameterType", gpType[i]);
-//		}
-		
-		
-		
-		
 	}
 
 }

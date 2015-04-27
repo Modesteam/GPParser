@@ -19,12 +19,14 @@ import annotations.OneRelations;
 	@HasOne(entity=Brand.class, reference="idBrand", belongs=true),
 	@HasOne(entity=Type.class, reference="idType", belongs=true)
 })
-@ManyRelations({@HasMany(entity=Model.class, foreignKey="idModel")})
+@ManyRelations({@HasMany(entity=Ticket.class, foreignKey="idModel")})
 public class Model {
 	
 	@Column(name="_id", nullable=false)
 	private int id;
 	private String name;
+	@Column(name="is_national", nullable=true)
+	private boolean isNational;
 	@Column(name="id_brand", nullable=false)
 	private int idBrand;
 	@Column(name="id_type", nullable=false)
@@ -39,13 +41,14 @@ public class Model {
 		this.id = id;
 	}
 	
-	public Model(String name, int idBrand, int idType) {
+	public Model(String name, boolean isNational, int idBrand, int idType) {
 		super();
 		this.name = name;
+		this.isNational = isNational;
 		this.idBrand = idBrand;
 		this.idType = idType;
 	}
-	
+
 	public int getId() {
 		return id;
 	}
@@ -70,11 +73,17 @@ public class Model {
 	public void setIdType(int idType) {
 		this.idType = idType;
 	}
-	
-	public boolean save() throws ClassNotFoundException, SQLException, NotNullableException{
+	public boolean isNational() {
+		return isNational;
+	}
+	public void setNational(boolean isNational) {
+		this.isNational = isNational;
+	}
+
+	public int save() throws ClassNotFoundException, SQLException, NotNullableException{
 		GenericPersistence gP = new GenericPersistence();
-		boolean result = gP.insertBean(this);
-		this.setId(Model.last().getId());
+		int result = gP.insertBean(this);
+		this.setId(result);
 		return result;
 	}
 	
@@ -142,9 +151,9 @@ public class Model {
 
 	@Override
 	public String toString() {
-		return "Model [id=" + id + ", name=" + name + ", idBrand=" + idBrand
-				+ ", idType=" + idType + "]";
-	}
-	
+		return "Model [id=" + id + ", name=" + name + ", isNational="
+				+ isNational + ", idBrand=" + idBrand + ", idType=" + idType
+				+ "]";
+	}	
 	
 }

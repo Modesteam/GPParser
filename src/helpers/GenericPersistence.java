@@ -7,11 +7,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+
+import com.sun.org.glassfish.external.statistics.annotations.Reset;
 
 import annotations.Column;
 import annotations.Entity;
@@ -37,14 +40,23 @@ public class GenericPersistence extends DatabaseConnection {
 		return this.conn;
 	}
 	
-	public boolean insertBean(Object bean) throws SQLException, NotNullableException {
+	public void beginTransaction() throws SQLException{
+		this.conn.setAutoCommit(false);
+	}
+	
+	public void endTransaction() throws SQLException{
+		this.conn.commit();
+		this.conn.setAutoCommit(true);
+	}
+	
+	public int insertBean(Object bean) throws SQLException, NotNullableException {
 		this.openConnection();
-		boolean result = insertBean(bean, this.conn);
+		int result = insertBean(bean, this.conn);
 		this.closeConnection();
 		return result;
 	}
 	
-	public boolean insertBean(Object bean, Connection conn) throws SQLException, NotNullableException {
+	public int insertBean(Object bean, Connection conn) throws SQLException, NotNullableException {
 		Entity entity = bean.getClass().getAnnotation(Entity.class);
 		ArrayList<Field> beanFields = getFields(bean);
 		
@@ -71,12 +83,17 @@ public class GenericPersistence extends DatabaseConnection {
 				
 		String sql = "INSERT INTO " + entity.table() + " (" + sqlSets.get(FIELDS) + ")";
 		sql += " VALUES(" + sqlSets.get(PARAMETERS)+")";
-		this.pst = conn.prepareStatement(sql);
+		this.pst = conn.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS);
 		
 		prepare(pst, bean, beanFields);
 		
-		int result = this.pst.executeUpdate();
-		return (result == 1) ? true : false;
+		this.pst.executeUpdate();
+		ResultSet rs = this.pst.getGeneratedKeys();
+		int key = 0;
+		if(rs.next()){
+			key = rs.getInt(1);
+		}
+		return key;
 	}
 	
 	public boolean insertAll(ArrayList<Object> beans, Connection conn) throws SQLException, NotNullableException {
@@ -109,14 +126,14 @@ public class GenericPersistence extends DatabaseConnection {
 		return (result == 1) ? true : false;
 	}
 	
-	public boolean insertMany(Object mainBean, Object linkedBean) throws SQLException{
+	public int insertMany(Object mainBean, Object linkedBean) throws SQLException{
 		this.openConnection();
-		boolean result = insertMany(mainBean, linkedBean, this.conn);
+		int result = insertMany(mainBean, linkedBean, this.conn);
 		this.closeConnection();
 		return result;
 	}
 	
-	public boolean insertMany(Object mainBean, Object linkedBean, Connection conn) throws SQLException{
+	public int insertMany(Object mainBean, Object linkedBean, Connection conn) throws SQLException{
 		ManyRelations hasMultiple = mainBean.getClass().getAnnotation(ManyRelations.class);
 		
 		if (hasMultiple != null){
@@ -138,7 +155,7 @@ public class GenericPersistence extends DatabaseConnection {
 				}
 			}
 		}
-		return false;
+		return 0;
 	}
 	
 	public Object selectBean(Object bean) throws SQLException {
@@ -355,7 +372,7 @@ public class GenericPersistence extends DatabaseConnection {
 		return selectWhere(bean, condition, getOrderField(bean), conn);
 	}
 	
-	public ArrayList<Object> selectWhere(Object bean, Condition condition, Field orderBy, Connection connection) throws SQLException{
+	public ArrayList<Object> selectWhere(Object bean, Condition condition, Field orderBy, Connection conn) throws SQLException{
 		ArrayList<Object> beans = new ArrayList<Object>();
 		ArrayList<Field> beanFields = getFields(bean);
 		
@@ -366,7 +383,6 @@ public class GenericPersistence extends DatabaseConnection {
 		if(orderBy != null){
 			sql+= " ORDER BY "+ databaseColumn(orderBy);
 		}
-		
 		this.pst = conn.prepareStatement(sql);
 
 		ResultSet rs = this.pst.executeQuery();
@@ -520,7 +536,7 @@ public class GenericPersistence extends DatabaseConnection {
 		String joiner = ",";
 		
 		for (int i = 0; i < columns.size(); i++) {
-			fieldString += columns.get(i);
+			fieldString += "`"+columns.get(i)+"`";
 			parameterString += "?";
 			if (i < columns.size() - 1) {
 				fieldString += joiner;
